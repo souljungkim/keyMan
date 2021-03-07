@@ -6,10 +6,15 @@
         <script src="../../crossman/src/js/crossman.js"></script>
         <link rel=stylesheet href="../src/css/keyman-view.css">
         <script src="../src/js/keyman.js"></script>
-        <script src="../src/js/keyman-keyhandler-shortcut.js"></script>
-        <script src="../src/js/keyman-keyhandler-command.js"></script>
-        <script src="../src/js/keyman-keyhandler-typing.js"></script>
-        <script src="../src/js/keyman-view.js"></script>
+        <script src="../src/js/keyhandler/keyman-keyhandler-shortcut.js"></script>
+        <script src="../src/js/keyhandler/keyman-keyhandler-command.js"></script>
+        <script src="../src/js/keyhandler/keyman-keyhandler-typing.js"></script>
+        <script src="../src/js/keyhandler/keyman-keyhandler-defined.js"></script>
+        <script src="../src/js/keyhandler/keyman-keyhandler-defined-command.js"></script>
+        <script src="../src/js/keytype/keyman-keytype-rome.js"></script>
+        <script src="../src/js/keytype/keyman-keytype-hangul.js"></script>
+        <script src="../src/js/keytype/keyman-keytype-kana.js"></script>
+        <script src="../src/js/view/keyman-view.js"></script>
         <style>
             * { margin:0; }
             /*div:focus { background-color: Aqua; }*/
@@ -21,8 +26,53 @@
             showKeyMapView();
             showKeyInputView();
         });
-        var keyman = new KeyMan();
+
+        var keyman = new KeyMan()
+            .addKeyType([
+                new KeyMan.HangulKeyType(),
+                new KeyMan.RomeKeyType(),
+                new KeyMan.KanaKeyType()
+            ])
+            .addCluster([
+                new KeyMan.DefinedKeyMapCluster()
+            ])
+            .addKeyHandler([
+                // new KeyMan.CommandKeyHandler(),
+                new KeyMan.ShortcutKeyHandler(),
+                // new KeyMan.TypingKeyHandler(),
+                new KeyMan.DefinedKeyHandler()
+                    .selectKeyMapCluster('defined')
+                    .addKeyGroup([
+                        new KeyMan.KeyGroup().setName('direction').setModeWorkOnlyHighestPriority(true).setModeWorkWhenKeyUp(true),
+                        new KeyMan.KeyGroup().setName('button').setModeWorkOnlyHighestPriority(true).setModeWorkWhenKeyUp(false)
+                    ])
+                    .addDefinedKey([
+                        new KeyMan.DefinedFunctionKey({name:"DUL",  group:"direction",  icon:"icon", keys:["w", "a"],   execute:function(e){ console.error('↙'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DUR",  group:"direction",  icon:"icon", keys:["w", "d"],   execute:function(e){ console.error('↗'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DDL",  group:"direction",  icon:"icon", keys:["s", "a"],   execute:function(e){ console.error('↙'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DDR",  group:"direction",  icon:"icon", keys:["s", "d"],   execute:function(e){ console.error('↘'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DU",   group:"direction",  icon:"icon", keys:["w"],        execute:function(e){ console.error('↑'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DD",   group:"direction",  icon:"icon", keys:["s"],        execute:function(e){ console.error('↓'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DL",   group:"direction",  icon:"icon", keys:["a"],        execute:function(e){ console.error('←'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"DR",   group:"direction",  icon:"icon", keys:["d"],        execute:function(e){ console.error('→'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BAB",  group:"button",     icon:"icon", keys:["t", "y"],   execute:function(e){ console.error('-🤜👊'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BCD",  group:"button",     icon:"icon", keys:["g", "h"],   execute:function(e){ console.error('-🦵🦶'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BAD",  group:"button",     icon:"icon", keys:["t", "h"],   execute:function(e){ console.error('/🤜🦶'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BBC",  group:"button",     icon:"icon", keys:["y", "g"],   execute:function(e){ console.error('/👊🦵'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BAC",  group:"button",     icon:"icon", keys:["t", "g"],   execute:function(e){ console.error('|🤜🦵'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BBD",  group:"button",     icon:"icon", keys:["y", "h"],   execute:function(e){ console.error('|👊🦶'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BA",   group:"button",     icon:"icon", keys:["t"],        execute:function(e){ console.error('🤜'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BB",   group:"button",     icon:"icon", keys:["y"],        execute:function(e){ console.error('👊'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BC",   group:"button",     icon:"icon", keys:["g"],        execute:function(e){ console.error('🦵'); } }),
+                        new KeyMan.DefinedFunctionKey({name:"BD",   group:"button",     icon:"icon", keys:["h"],        execute:function(e){ console.error('🦶'); } })
+                    ]),
+                new KeyMan.DefinedCommandKeyHandler()
+            ])
+
+            ;
+
         var keymanView = new KeyMan.View(keyman);
+
         keyman
                 // .addEventListener('shortcutkeydown', function(eventData){
                 //     if (!eventData.keyStepList)
@@ -71,9 +121,9 @@
                 //     console.error('removedmap!!', eventData);
                 //     showKeyMapView();
                 // })
-                .addEventListener('execute', function(eventData){
-                    console.error('execute!!', eventData);
-                    var functionKey = eventData.functionKey
+                .addEventListener(KeyMan.EVENT_EXECUTE, function(eventData){
+                    console.error('execute!!!!!', eventData);
+                    var functionKey = eventData.functionKey;
                     var runner = eventData.runner;
                     var data = eventData.data;
                     if (runner !== null){
@@ -91,14 +141,98 @@
                     //- OR
                     keyman.getRunnerPool().run(runner, data);
                 })
-                .addEventListener('untypeable', function(eventData){
+                .addEventListener(KeyMan.EVENT_UNTYPEABLE, function(eventData){
                     getEl('div-show-signal').setStyle('color', 'red');
                 })
-                .addEventListener('typeable', function(eventData){
+                .addEventListener(KeyMan.EVENT_TYPEABLE, function(eventData){
                     getEl('div-show-signal').setStyle('color', 'green');
-                });
+                })
+                ;
+
         keyman.getUser().setModeAutoSave(true).load();
+
         keyman
+            .add({
+                type: KeyMan.DefinedCommandKeyHandler.TYPE,
+                name: 'First Skill',
+                keys: [['DD'], ['DR']],
+                execute: function(e){ console.error('아따라따라뚜겐!!') }
+            });
+
+        keyman.getCluster('defined')
+            .add({
+                name: 'DDL',
+                keys: ['s', 'a'],
+            })
+            .add({
+                name: 'DDR',
+                keys: ['s','d'],
+            })
+            .add({
+                name: 'DUL',
+                keys: ['w', 'a'],
+            })
+            .add({
+                name: 'DUR',
+                keys: ['w', 'd'],
+            })
+            .add({
+                name: 'DU',
+                keys: ['w'],
+            })
+            .add({
+                name: 'DD',
+                keys: ['s'],
+            })
+            .add({
+                name: 'DL',
+                keys: ['a'],
+            })
+            .add({
+                name: 'DR',
+                keys: ['d'],
+            })
+            .add({
+                name: 'BA',
+                keys: ['t'],
+            })
+            .add({
+                name: 'BB',
+                keys: ['y'],
+            })
+            .add({
+                name: 'BC',
+                keys: ['g'],
+            })
+            .add({
+                name: 'BD',
+                keys: ['h'],
+            })
+            ;
+
+        keyman
+            .add({
+                name: '_change_key_type-1',
+                keys: ['HANGULMODE'],
+                execute: function(e){
+                    keyman.toggleKeyType();
+                }
+            })
+            .add({
+                name: '_change_key_type-2',
+                keys: ['CTRL', 'SPACE'],
+                execute: function(e){
+                    keyman.toggleKeyType();
+                }
+            })
+            .add({
+                name: '_change_key_type',
+                keys: [['CTRL'], ['CTRL'], ['A']],
+                execute: function(e){
+                    console.error("!!!!!!!!!!");
+                    keyman.toggleKeyType();
+                }
+            })
             .add({
                 name: 'tool-setup',
                 keys: [['ctrl', 'alt', 'shift', 's']],
@@ -107,29 +241,31 @@
                 }
             })
             .add({
-                name: 'tool-setup',
+                name: 'tool-setup2',
                 keys: [['ctrl', 'shift', 'e']],
                 execute: function(e){
                     // keymanView.exportData();
                 }
             })
             .add({
-                name: 'tool-setup',
+                name: 'tool-setup3',
                 keys: [['ctrl', 'shift', 'i']],
                 execute: function(e){
                     // keymanView.importData();
                 }
             })
             .add({
+                id: 'test-002',
                 name: 'add-key',
-                keys: [['ctrl'], ['a'], ['d'], ['d']],
+                keys: [['ctrl'], ['d'], ['d']],
                 execute: function(e){
                     var currentKeyMap = keymanView.getCurrentKeyMap();
                     if (!currentKeyMap)
                         return;
                     keymanView.generatePopViewForKeyProperties(currentKeyMap).appendTo(document.body);
                 }
-            });
+            })
+                ;
 
         // keyman.add({
         //     name:'develop-tool',
@@ -172,18 +308,18 @@
         // });
         //
         //
-        // keyman.add({
-        //     name:'test-simplely',
-        //     title: 'Welcome to SJJS',
-        //     keys: [['s'], ['j'], ['j'], ['s']],
-        //     runner: 'C',
-        //     keydown: function(event){
-        //         document.getElementById('tester').innerHTML = 'Simple Test Down';
-        //     },
-        //     keyup: function(event){
-        //         document.getElementById('tester').innerHTML = 'Simple Test Up';
-        //     }
-        // });
+        keyman.add({
+            name:'test-simplely',
+            title: 'Welcome to SJJS',
+            keys: [['s'], ['j'], ['j'], ['s']],
+            runner: 'C',
+            keydown: function(event){
+                document.getElementById('tester').innerHTML = 'Simple Test Down';
+            },
+            keyup: function(event){
+                document.getElementById('tester').innerHTML = 'Simple Test Up';
+            }
+        });
         // keyman.remove({name: 'test-simplely'});
 
         keyman.getRunnerPool()
@@ -200,7 +336,10 @@
         keyman.getRunnerPool().getRunnerMap();
         keyman.getRunnerPool().run('123', {a:1, b:2});
 
+    </script>
 
+
+    <script>
         function showKeyMapView(){
             getEl('div-tool-key-map').exists(function(it){
                 it.html('').add( keymanView.generateKeyManViewContext(keyman.getUser()) );
@@ -217,6 +356,7 @@
             keymanView.generateKeyInputView(keyman).appendTo('div-key-input-view');
         }
     </script>
+
 
     <body>
         <div id="div-key-input-view" class="light-keys" style="position:absolute; top:0px; left:0px;">

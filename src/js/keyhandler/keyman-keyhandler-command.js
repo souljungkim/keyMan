@@ -5,6 +5,10 @@
  *************************/
 KeyMan.CommandKeyHandler = getClazz(function(keyman){
     KeyMan.KeyHandler.apply(this, arguments);
+    //Meta
+    this.name = KeyMan.CommandKeyHandler.TYPE;
+    this.type = KeyMan.CommandKeyHandler.TYPE;
+
     //Test - Process
     this.keyOrderList = [];
     this.keyStepProcessList = [];
@@ -22,13 +26,18 @@ KeyMan.CommandKeyHandler = getClazz(function(keyman){
 .extend(KeyMan.KeyHandler)
 .returnFunction();
 
+KeyMan.CommandKeyHandler.TYPE = 'COMMAND';
+KeyMan.CommandKeyHandler.EVENT_COMMANDKEYDOWN = 'commandkeydown';
+KeyMan.CommandKeyHandler.EVENT_COMMANDKEYUP = 'commandkeyup';
+
 KeyMan.CommandKeyHandler.prototype.setup = function(){
     var that = this;
     var keyman = this.keyman;
     this.setBeforeKeydownEventHandler(function(eventData){
         var key = eventData.key;
+        var upperKey = eventData.upperKey;
         //Check Pressed - Not allowed
-        that.statusPressed = !!keyman.downedKeyMap[key];
+        that.statusPressed = !!keyman.downedKeyMap[upperKey];
     });
     this.setKeydownEventHandler(function(eventData){
         //Check Pressed - Not allowed
@@ -45,9 +54,29 @@ KeyMan.CommandKeyHandler.prototype.setup = function(){
         that.keyup(key);
     });
 };
-KeyMan.CommandKeyHandler.prototype.keydown = function(key){
+
+KeyMan.CommandKeyHandler.prototype.checkMyTypeByFunctionKey = function(functionKey){
+    return (functionKey.keys instanceof Array && functionKey.keys.length > 0 && functionKey.keys[0] instanceof Array)
+        && (functionKey.keyStepList.length > 1)
+        ;
+};
+
+
+KeyMan.CommandKeyHandler.prototype.beforeKeydown = function(eventData){
+    var key = eventData.key;
+    var upperKey = eventData.upperKey;
+    //Check Pressed - Not allowed
+    this.statusPressed = !!this.keyman.downedKeyMap[upperKey];
+};
+KeyMan.CommandKeyHandler.prototype.keydown = function(eventData){
     var that = this;
     var keyman = this.keyman;
+
+    //Check Pressed - Not allowed
+    if (that.statusPressed)
+        return false;
+    var key = eventData.key;
+
     //Check Time - Decision 'Continue' and 'Reset'
     var currentTime = new Date().getTime();
     var connectionTime = currentTime - that.lastKeyDownTime;
@@ -65,16 +94,22 @@ KeyMan.CommandKeyHandler.prototype.keydown = function(key){
     that.execute(keyman.mainClusterList, that.keyStepProcessList, that.keyOrderList);
     // that.checkTimer();
     /** Event **/
-    keyman.execEventListenerByEventName('commandkeydown', {
+    keyman.execEventListenerByEventName(KeyMan.CommandKeyHandler.EVENT_COMMANDKEYDOWN, {
         keyStepList: this.keyStepProcessList,
         indexedFunctionKeyBufferMap: this.indexedFunctionKeyBufferMap,
         matchingStartKeyStepIndex: this.matchingStartKeyStepIndex,
         matchingProcessKeyStepIndex: this.matchingProcessKeyStepIndex
     });
 };
-KeyMan.CommandKeyHandler.prototype.keyup = function(key){
+KeyMan.CommandKeyHandler.prototype.beforeKeyup = function(eventData){
+    //None
+};
+KeyMan.CommandKeyHandler.prototype.keyup = function(eventData){
     var that = this;
     var keyman = this.keyman;
+
+    var key = eventData.key;
+
     //Check Keyup
     var downedKeyList = Object.keys(keyman.downedKeyMap);
     var nowKeySize = downedKeyList.length;
@@ -94,7 +129,7 @@ KeyMan.CommandKeyHandler.prototype.keyup = function(key){
     /** Status **/
     that.lastKey = null;
     /** Event **/
-    keyman.execEventListenerByEventName('commandkeyup', {
+    keyman.execEventListenerByEventName(KeyMan.CommandKeyHandler.EVENT_COMMANDKEYUP, {
         keyStepList: that.keyStepProcessList
     });
 };
@@ -150,7 +185,7 @@ KeyMan.CommandKeyHandler.prototype.execute = function(keyClusterList, keyStepPro
         var inversionIndexedFunctionKeyMapMap;
         for (var k=0, currentKeyCluster; k<keyClusterList.length; k++){
             currentKeyCluster = keyClusterList[k];
-            inversionIndexedFunctionKeyMapMap = currentKeyCluster.getIndexedCommandKeyMap();
+            inversionIndexedFunctionKeyMapMap = currentKeyCluster.getIndexedKeyMap(this.type);
             var keys = keyStepProcess.keys;
             var keyMap, fKeyFound;
             for (var i=0, key; i<keys.length; i++){
@@ -182,23 +217,26 @@ KeyMan.CommandKeyHandler.prototype.execute = function(keyClusterList, keyStepPro
         for (var i=0, fKeyFound, keyStepFound; i<indexedFunctionKeyBufferMap.length; i++){
             fKeyFound = indexedFunctionKeyBufferMap[i];
             keyStepFound = fKeyFound.keyStepList[this.matchingProcessKeyStepIndex];
+            console.error('COMMAND ?????', fKeyFound.keyStepList.length -1, this.matchingProcessKeyStepIndex, keyStepProcess, keyStepFound);
             if (keyStepProcess.equals(keyStepFound)){
                 keyStepProcess.setStatus(KeyMan.KeyStep.STATUS_CHECKING);
-                if (fKeyFound.keyStepList.length -1 == this.matchingProcessKeyStepIndex){
-                    if (!fKeyFound.modeLock){
-                        this.checkKeyStepList(keyStepProcessList);
-                        this.executeFunctionKey(fKeyFound);
-                    }
+                var statusAllMatching = fKeyFound.keyStepList.length -1 == this.matchingProcessKeyStepIndex;
+                if (statusAllMatching && !fKeyFound.modeLock){
+                    this.checkKeyStepList(keyStepProcessList);
+                    this.executeFunctionKey(fKeyFound);
                 }else{
                     newIndexedFunctionKeyBufferMap.push(fKeyFound); //Collecting next matching KeyStepList
                 }
-            }else{
-                this.matchingStartKeyStepIndex = -1;
+                break;
             }
         }
+        if (newIndexedFunctionKeyBufferMap.length == 0)
+            this.matchingStartKeyStepIndex = -1;
     }
 
     this.indexedFunctionKeyBufferMap = newIndexedFunctionKeyBufferMap;
+    console.error('buffer', keyStepProcessIndex, newIndexedFunctionKeyBufferMap, indexedFunctionKeyBufferMap.length, 'Next=', this.matchingStartKeyStepIndex);
+
     console.debug('[Command buffer]', this.indexedFunctionKeyBufferMap);
     return this;
 };
@@ -220,7 +258,7 @@ KeyMan.CommandKeyHandler.prototype.executeFunctionKey = function(functionKey, ke
     }
     functionKey.execute();
     if (this.keyman){
-        this.keyman.execEventListenerByEventName('execute', {
+        this.keyman.execEventListenerByEventName(KeyMan.EVENT_EXECUTE, {
             keyStepList: this.keyStepProcessList,
             functionKey: functionKey,
         });
